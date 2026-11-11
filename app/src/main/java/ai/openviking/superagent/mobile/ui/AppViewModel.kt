@@ -112,12 +112,29 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         }
         _state.update { it.copy(testState = TestState(running = true)) }
         viewModelScope.launch {
-            val result = runCatching {
-                client.listInstances(ServerConfig(normalized, token.trim()))
+            val result = runCatching<InstancesResponse?> {
+                try {
+                    client.listInstances(ServerConfig(normalized, token.trim()))
+                } catch (error: ApiException) {
+                    // A daemon used directly has /api/activity but no instance list.
+                    if (error.statusCode == 404) {
+                        client.activity(
+                            config = ServerConfig(normalized, token.trim()),
+                            instanceId = null,
+                            epoch = EpochSelection.Current,
+                            limit = 1,
+                        )
+                        null
+                    } else {
+                        throw error
+                    }
+                }
             }
             result.fold(
                 onSuccess = { response ->
-                    val names = response.instances.joinToString("、") { it.label }.ifBlank { "默认实例" }
+                    val names = response?.instances?.joinToString("、") { it.label }
+                        ?.ifBlank { "默认实例" }
+                        ?: "直连 daemon"
                     _state.update {
                         it.copy(testState = TestState(ok = true, message = "连接成功：$names"))
                     }
