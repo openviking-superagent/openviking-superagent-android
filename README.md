@@ -31,9 +31,9 @@ adb install SuperAgent-Mobile-debug.apk
 
 控制台默认只监听 `127.0.0.1:3737`，并且服务端会校验 Host。手机直接用局域网 IP 访问会得到 403，这不是 App 的问题。两种可行方式：
 
-### 方式 A：访问网关（推荐给手机）
+### 方式 A：访问网关（host + token，推荐给手机）
 
-在运行 SuperAgent 的电脑上，从本仓库运行一个只读网关：
+不需要隧道。在运行 SuperAgent 的电脑上，从本仓库运行一个只读网关，手机直接连它：
 
 ```bash
 # 生成一个共享令牌
@@ -55,9 +55,20 @@ echo "token: $TOKEN"
 
 网关只转发 `GET /api/instances`、`/api/activity`、`/health`、`/ready`，并把 Host 改写成 `127.0.0.1:3737`，所以控制台不需要改监听地址。`--host 0.0.0.0` 不带令牌会拒绝启动。
 
-### 方式 B：SSH / Tailscale 隧道
+不想每次敲参数就用配置文件：
 
-用 SSH 把控制台的**原端口**映射到手机或内网：
+```bash
+cp bridge/config.example.json bridge/config.local.json
+chmod 600 bridge/config.local.json
+# 改 host / port / token
+node bridge/server.mjs --config bridge/config.local.json
+```
+
+`--token-file` 可以从单独的文件读令牌；CLI 参数覆盖环境变量，环境变量覆盖配置文件。
+
+### 方式 B：SSH 隧道（备选）
+
+如果机器已经开了 SSH，也可以把控制台的**原端口**映射到手机或内网：
 
 ```bash
 ssh -N -L 3737:127.0.0.1:3737 <user>@<server>

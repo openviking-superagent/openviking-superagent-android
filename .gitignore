@@ -9,3 +9,4 @@ app/release/
 *.keystore
 *.jks
 dist/
+bridge/config.local.json

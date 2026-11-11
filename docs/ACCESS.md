@@ -18,7 +18,9 @@
 
 App 的“服务地址 + 访问令牌”对应第 1 类；令牌留空、地址填 `http://127.0.0.1:3737` 对应第 2 类。
 
-## 网关
+## 网关（host + token）
+
+这是 App 的默认远程方案，不需要隧道：网关监听一个可访问的地址，客户端带 token，网关把 Host 改写成 loopback 再转发。
 
 ```bash
 TOKEN=$(openssl rand -hex 24)
@@ -27,6 +29,24 @@ SUPERAGENT_BRIDGE_TOKEN="$TOKEN" node bridge/server.mjs \
   --host 0.0.0.0 \
   --port 8787
 ```
+
+也可以写成配置文件，适合开机自启：
+
+```json
+{
+  "target": "http://127.0.0.1:3737",
+  "host": "0.0.0.0",
+  "port": 8787,
+  "token": "replace-with-a-random-token"
+}
+```
+
+```bash
+chmod 600 bridge/config.local.json
+node bridge/server.mjs --config bridge/config.local.json
+```
+
+优先级是 CLI > 环境变量 > 配置文件 > 默认值。`--token-file` 支持把令牌放在单独文件里。
 
 行为：
 

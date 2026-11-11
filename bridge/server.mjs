@@ -8,6 +8,7 @@
 // tailnet address, requires a shared token, and forwards only the two read-only
 // JSON endpoints with a loopback Host header.
 
+import fs from 'node:fs';
 import http from 'node:http';
 import https from 'node:https';
 import { createHash, timingSafeEqual } from 'node:crypto';
@@ -20,28 +21,79 @@ function usage() {
   return `SuperAgent mobile gateway
 
 Usage:
+  node bridge/server.mjs --config bridge/config.local.json
   node bridge/server.mjs --target http://127.0.0.1:3737 --host 0.0.0.0 --port 8787 --token <token>
 
 Options:
+  --config <path>  JSON config file; see bridge/config.example.json
   --target <url>   SuperAgent web console (default: http://127.0.0.1:3737)
   --host <addr>    Listen address (default: 127.0.0.1)
   --port <n>       Listen port (default: 8787)
   --token <value>  Shared token required from clients. Also read from
                    SUPERAGENT_BRIDGE_TOKEN. Required when --host is not loopback.
+  --token-file <path>
+                   Read the token from a file (trailing newline allowed).
   --help           Show this help.
+
+Precedence: CLI > environment > config file > defaults.
 
 The gateway is read-only: GET /api/instances, /api/activity, /health, /ready.
 Put it behind Tailscale, WireGuard, or an SSH tunnel on untrusted networks.
 `;
 }
 
+function readTokenFile(file) {
+  const value = fs.readFileSync(file, 'utf8').trim();
+  if (!value) throw new Error(`token file is empty: ${file}`);
+  return value;
+}
+
+function loadConfigFile(file) {
+  let parsed;
+  try {
+    parsed = JSON.parse(fs.readFileSync(file, 'utf8'));
+  } catch (error) {
+    throw new Error(`cannot read config file ${file}: ${error.message}`);
+  }
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+    throw new Error(`config file must contain a JSON object: ${file}`);
+  }
+  const allowed = new Set(['target', 'host', 'port', 'token', 'tokenFile']);
+  for (const key of Object.keys(parsed)) {
+    if (!allowed.has(key)) throw new Error(`unknown config key: ${key}`);
+  }
+  return parsed;
+}
+
 function parseArgs(argv) {
   const options = {
-    target: process.env.SUPERAGENT_TARGET || 'http://127.0.0.1:3737',
-    host: process.env.SUPERAGENT_BRIDGE_HOST || '127.0.0.1',
-    port: Number(process.env.SUPERAGENT_BRIDGE_PORT || 8787),
-    token: process.env.SUPERAGENT_BRIDGE_TOKEN || '',
+    target: 'http://127.0.0.1:3737',
+    host: '127.0.0.1',
+    port: 8787,
+    token: '',
   };
+
+  let configPath = null;
+  for (let i = 0; i < argv.length; i += 1) {
+    if (argv[i] === '--config') {
+      configPath = argv[i + 1];
+      if (!configPath || configPath.startsWith('--')) throw new Error('--config needs a path');
+      i += 1;
+    }
+  }
+  if (configPath) {
+    const fileOptions = loadConfigFile(configPath);
+    for (const key of ['target', 'host', 'port', 'token']) {
+      if (fileOptions[key] !== undefined) options[key] = fileOptions[key];
+    }
+    if (fileOptions.tokenFile !== undefined) options.token = readTokenFile(fileOptions.tokenFile);
+  }
+
+  if (process.env.SUPERAGENT_TARGET) options.target = process.env.SUPERAGENT_TARGET;
+  if (process.env.SUPERAGENT_BRIDGE_HOST) options.host = process.env.SUPERAGENT_BRIDGE_HOST;
+  if (process.env.SUPERAGENT_BRIDGE_PORT) options.port = Number(process.env.SUPERAGENT_BRIDGE_PORT);
+  if (process.env.SUPERAGENT_BRIDGE_TOKEN) options.token = process.env.SUPERAGENT_BRIDGE_TOKEN;
+
   for (let i = 0; i < argv.length; i += 1) {
     const arg = argv[i];
     const take = () => {
@@ -50,13 +102,20 @@ function parseArgs(argv) {
       i += 1;
       return value;
     };
+    if (arg === '--config') {
+      take();
+      continue;
+    }
     if (arg === '--target') options.target = take();
     else if (arg === '--host') options.host = take();
     else if (arg === '--port') options.port = Number(take());
     else if (arg === '--token') options.token = take();
+    else if (arg === '--token-file') options.token = readTokenFile(take());
     else if (arg === '--help' || arg === '-h') options.help = true;
     else throw new Error(`unknown option: ${arg}`);
   }
+  options.port = Number(options.port);
+  options.token = String(options.token ?? '');
   return options;
 }
 
