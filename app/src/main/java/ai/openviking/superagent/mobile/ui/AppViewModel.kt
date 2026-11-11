@@ -280,7 +280,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             while (isActive) {
                 delay(POLL_MS)
                 val state = _state.value
-                if (!state.paused && state.selectedEpoch is EpochSelection.Current && !state.loading) {
+                if (!state.paused && state.selectedEpoch !is EpochSelection.Session && !state.loading) {
                     pollOnce()
                 }
             }
@@ -374,10 +374,15 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         try {
             val previousEpoch = current.currentEpoch
             val maxId = rows.keys.maxOrNull()
+            val pollEpoch = if (current.selectedEpoch is EpochSelection.All) {
+                EpochSelection.All
+            } else {
+                EpochSelection.Current
+            }
             var data = client.activity(
                 config = config,
                 instanceId = current.instanceId,
-                epoch = EpochSelection.Current,
+                epoch = pollEpoch,
                 limit = PAGE_SIZE,
                 after = maxId,
             )
@@ -385,7 +390,11 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             applyMeta(data)
             if (expectedGeneration != generation) return
             val newEpoch = _state.value.currentEpoch
-            if (previousEpoch != null && newEpoch != null && previousEpoch != newEpoch) {
+            if (current.selectedEpoch is EpochSelection.Current
+                && previousEpoch != null
+                && newEpoch != null
+                && previousEpoch != newEpoch
+            ) {
                 // /new or a runtime switch starts a fresh session. Rebuild rather
                 // than appending the new session to rows from the old one.
                 reload()
@@ -398,7 +407,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                 data = client.activity(
                     config = config,
                     instanceId = current.instanceId,
-                    epoch = EpochSelection.Current,
+                    epoch = pollEpoch,
                     limit = PAGE_SIZE,
                     after = after,
                 )
