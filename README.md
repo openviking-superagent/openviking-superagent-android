@@ -19,7 +19,7 @@
 
 ## 安装
 
-从 [Releases](../../releases) 下载 `SuperAgent-Mobile-debug.apk`，或从 Actions 的 `superagent-mobile-debug-apk` 工件下载。
+从 [Releases](https://github.com/openviking-superagent/openviking-superagent-android/releases) 下载 `SuperAgent-Mobile-debug.apk`，或从 Actions 的 `superagent-mobile-debug-apk` 工件下载。
 
 ```bash
 adb install SuperAgent-Mobile-debug.apk

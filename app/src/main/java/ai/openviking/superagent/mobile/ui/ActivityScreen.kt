@@ -105,6 +105,18 @@ fun ActivityScreen(
                 }
             }
     }
+    // Steps inside the last turn change without changing the item count, so the
+    // list needs a second nudge when the turn's last row id moves.
+    val lastFeedId = state.feed.turns.lastOrNull()?.lastId
+        ?: state.feed.items.lastOrNull()?.lastId
+        ?: 0L
+    LaunchedEffect(lastFeedId) {
+        if (follow && !showSystem) {
+            delay(60)
+            val count = listState.layoutInfo.totalItemsCount
+            if (count > 0) listState.scrollToItem(count - 1)
+        }
+    }
 
     Scaffold(
         topBar = {
