@@ -1,0 +1,65 @@
+name: Android CI
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build and test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: Unit tests
+        run: ./gradlew --no-daemon testDebugUnitTest
+
+      - name: Build debug APK
+        run: ./gradlew --no-daemon assembleDebug
+
+      - name: Rename APK
+        run: |
+          mkdir -p dist
+          cp app/build/outputs/apk/debug/app-debug.apk dist/SuperAgent-Mobile-debug.apk
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: superagent-mobile-debug-apk
+          path: dist/SuperAgent-Mobile-debug.apk
+          if-no-files-found: error
+
+  release:
+    name: Attach APK to GitHub Release
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: superagent-mobile-debug-apk
+          path: dist
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: dist/SuperAgent-Mobile-debug.apk
+          generate_release_notes: true
+          body: |
+            SuperAgent 手机端（Android）调试签名 APK，可直接侧载安装。
+
+            安装：`adb install SuperAgent-Mobile-debug.apk`，或在手机上允许未知来源后打开。
+            连接方式见 README 和 docs/ACCESS.md。

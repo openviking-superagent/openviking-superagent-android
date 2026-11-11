@@ -1,0 +1,14 @@
+{
+  "name": "superagent-mobile-bridge",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Read-only token gateway from a phone to the local SuperAgent activity console",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "start": "node server.mjs"
+  },
+  "license": "AGPL-3.0"
+}
